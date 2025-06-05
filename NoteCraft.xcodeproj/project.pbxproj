@@ -6,13 +6,36 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		8EA8477F2DF2096100F5FAF6 /* FirebaseAuth in Frameworks */ = {isa = PBXBuildFile; productRef = 8EA8477E2DF2096100F5FAF6 /* FirebaseAuth */; };
+		8EA847812DF2096100F5FAF6 /* FirebaseCore in Frameworks */ = {isa = PBXBuildFile; productRef = 8EA847802DF2096100F5FAF6 /* FirebaseCore */; };
+		8EA847832DF2096100F5FAF6 /* FirebaseFirestore in Frameworks */ = {isa = PBXBuildFile; productRef = 8EA847822DF2096100F5FAF6 /* FirebaseFirestore */; };
+		8EA847852DF2096100F5FAF6 /* FirebaseStorage in Frameworks */ = {isa = PBXBuildFile; productRef = 8EA847842DF2096100F5FAF6 /* FirebaseStorage */; };
+		8EA847882DF20AB400F5FAF6 /* GoogleSignIn in Frameworks */ = {isa = PBXBuildFile; productRef = 8EA847872DF20AB400F5FAF6 /* GoogleSignIn */; };
+		8EA8478A2DF20AB400F5FAF6 /* GoogleSignInSwift in Frameworks */ = {isa = PBXBuildFile; productRef = 8EA847892DF20AB400F5FAF6 /* GoogleSignInSwift */; };
+		8EA8478E2DF2121400F5FAF6 /* FirebaseAnalytics in Frameworks */ = {isa = PBXBuildFile; productRef = 8EA8478D2DF2121400F5FAF6 /* FirebaseAnalytics */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXFileReference section */
 		8EB2C0942DF1C7B2000C4E58 /* NoteCraft.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = NoteCraft.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		8EA847922DF216F800F5FAF6 /* Exceptions for "NoteCraft" folder in "NoteCraft" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 8EB2C0932DF1C7B2000C4E58 /* NoteCraft */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		8EB2C0962DF1C7B2000C4E58 /* NoteCraft */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				8EA847922DF216F800F5FAF6 /* Exceptions for "NoteCraft" folder in "NoteCraft" target */,
+			);
 			path = NoteCraft;
 			sourceTree = "<group>";
 		};
@@ -23,6 +46,13 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				8EA8478E2DF2121400F5FAF6 /* FirebaseAnalytics in Frameworks */,
+				8EA847882DF20AB400F5FAF6 /* GoogleSignIn in Frameworks */,
+				8EA847812DF2096100F5FAF6 /* FirebaseCore in Frameworks */,
+				8EA847852DF2096100F5FAF6 /* FirebaseStorage in Frameworks */,
+				8EA8478A2DF20AB400F5FAF6 /* GoogleSignInSwift in Frameworks */,
+				8EA8477F2DF2096100F5FAF6 /* FirebaseAuth in Frameworks */,
+				8EA847832DF2096100F5FAF6 /* FirebaseFirestore in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -65,6 +95,13 @@
 			);
 			name = NoteCraft;
 			packageProductDependencies = (
+				8EA8477E2DF2096100F5FAF6 /* FirebaseAuth */,
+				8EA847802DF2096100F5FAF6 /* FirebaseCore */,
+				8EA847822DF2096100F5FAF6 /* FirebaseFirestore */,
+				8EA847842DF2096100F5FAF6 /* FirebaseStorage */,
+				8EA847872DF20AB400F5FAF6 /* GoogleSignIn */,
+				8EA847892DF20AB400F5FAF6 /* GoogleSignInSwift */,
+				8EA8478D2DF2121400F5FAF6 /* FirebaseAnalytics */,
 			);
 			productName = NoteCraft;
 			productReference = 8EB2C0942DF1C7B2000C4E58 /* NoteCraft.app */;
@@ -94,6 +131,10 @@
 			);
 			mainGroup = 8EB2C08B2DF1C7B2000C4E58;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				8EA8477D2DF2096000F5FAF6 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */,
+				8EA847862DF20AB400F5FAF6 /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 8EB2C0952DF1C7B2000C4E58 /* Products */;
 			projectDirPath = "";
@@ -255,6 +296,7 @@
 				DEVELOPMENT_TEAM = TAA654C9PA;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = NoteCraft/Info.plist;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -284,6 +326,7 @@
 				DEVELOPMENT_TEAM = TAA654C9PA;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = NoteCraft/Info.plist;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -324,6 +367,63 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		8EA8477D2DF2096000F5FAF6 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/firebase/firebase-ios-sdk.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 11.14.0;
+			};
+		};
+		8EA847862DF20AB400F5FAF6 /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/google/GoogleSignIn-iOS.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 8.0.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		8EA8477E2DF2096100F5FAF6 /* FirebaseAuth */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 8EA8477D2DF2096000F5FAF6 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseAuth;
+		};
+		8EA847802DF2096100F5FAF6 /* FirebaseCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 8EA8477D2DF2096000F5FAF6 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseCore;
+		};
+		8EA847822DF2096100F5FAF6 /* FirebaseFirestore */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 8EA8477D2DF2096000F5FAF6 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseFirestore;
+		};
+		8EA847842DF2096100F5FAF6 /* FirebaseStorage */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 8EA8477D2DF2096000F5FAF6 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseStorage;
+		};
+		8EA847872DF20AB400F5FAF6 /* GoogleSignIn */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 8EA847862DF20AB400F5FAF6 /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */;
+			productName = GoogleSignIn;
+		};
+		8EA847892DF20AB400F5FAF6 /* GoogleSignInSwift */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 8EA847862DF20AB400F5FAF6 /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */;
+			productName = GoogleSignInSwift;
+		};
+		8EA8478D2DF2121400F5FAF6 /* FirebaseAnalytics */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 8EA8477D2DF2096000F5FAF6 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseAnalytics;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 8EB2C08C2DF1C7B2000C4E58 /* Project object */;
 }
