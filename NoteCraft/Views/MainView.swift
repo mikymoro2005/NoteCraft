@@ -105,11 +105,143 @@ class FolderManager: ObservableObject {
             currentPath = Array(currentPath.prefix(index + 1))
         }
     }
+    
+    // MARK: - Folder Operations
+    
+    func updateFolder(_ folder: Folder, newName: String, newColor: Color) {
+        var updatedFolder = folder
+        updatedFolder.name = newName
+        updatedFolder.color = newColor
+        
+        rootFolders = updateFolderRecursive(folders: rootFolders, targetFolder: updatedFolder)
+        updateCurrentPath()
+    }
+    
+    func deleteFolder(_ folder: Folder) {
+        rootFolders = deleteFolderRecursive(folders: rootFolders, targetId: folder.id)
+        updateCurrentPath()
+    }
+    
+    func moveFolder(_ folder: Folder, to destinationPath: [Folder]) -> Bool {
+        // Verifica se si sta tentando di spostare una cartella in una sua sottocartella
+        if !destinationPath.isEmpty {
+            let destinationFolder = destinationPath.last!
+            if isSubfolderOf(destinationFolder, in: folder) {
+                return false // Spostamento non valido
+            }
+        }
+        
+        // Prima rimuovi la cartella dalla posizione attuale
+        rootFolders = deleteFolderRecursive(folders: rootFolders, targetId: folder.id)
+        
+        // Poi aggiungila nella nuova posizione
+        if destinationPath.isEmpty {
+            rootFolders.append(folder)
+        } else {
+            rootFolders = addFolderToPathRecursive(folders: rootFolders, targetPath: destinationPath, folderToAdd: folder)
+        }
+        
+        updateCurrentPath()
+        return true // Spostamento riuscito
+    }
+    
+    func getAllFolders() -> [Folder] {
+        return getAllFoldersRecursive(folders: rootFolders)
+    }
+    
+    // MARK: - Private Helper Methods
+    
+    private func updateFolderRecursive(folders: [Folder], targetFolder: Folder) -> [Folder] {
+        var updatedFolders = folders
+        
+        for i in 0..<updatedFolders.count {
+            if updatedFolders[i].id == targetFolder.id {
+                var updated = targetFolder
+                updated.content = updatedFolders[i].content // Mantieni il contenuto esistente
+                updatedFolders[i] = updated
+            } else {
+                var folder = updatedFolders[i]
+                folder.content = updateFolderRecursive(folders: folder.content, targetFolder: targetFolder)
+                updatedFolders[i] = folder
+            }
+        }
+        
+        return updatedFolders
+    }
+    
+    private func deleteFolderRecursive(folders: [Folder], targetId: UUID) -> [Folder] {
+        var updatedFolders: [Folder] = []
+        
+        for folder in folders {
+            if folder.id != targetId {
+                var updatedFolder = folder
+                updatedFolder.content = deleteFolderRecursive(folders: folder.content, targetId: targetId)
+                updatedFolders.append(updatedFolder)
+            }
+        }
+        
+        return updatedFolders
+    }
+    
+    private func addFolderToPathRecursive(folders: [Folder], targetPath: [Folder], folderToAdd: Folder) -> [Folder] {
+        guard !targetPath.isEmpty else { return folders }
+        
+        let targetId = targetPath[0].id
+        var updatedFolders = folders
+        
+        for i in 0..<updatedFolders.count {
+            if updatedFolders[i].id == targetId {
+                if targetPath.count == 1 {
+                    var updatedFolder = updatedFolders[i]
+                    updatedFolder.content.append(folderToAdd)
+                    updatedFolders[i] = updatedFolder
+                } else {
+                    let remainingPath = Array(targetPath.dropFirst())
+                    var updatedFolder = updatedFolders[i]
+                    updatedFolder.content = addFolderToPathRecursive(
+                        folders: updatedFolder.content,
+                        targetPath: remainingPath,
+                        folderToAdd: folderToAdd
+                    )
+                    updatedFolders[i] = updatedFolder
+                }
+                break
+            }
+        }
+        
+        return updatedFolders
+    }
+    
+    private func getAllFoldersRecursive(folders: [Folder]) -> [Folder] {
+        var allFolders: [Folder] = []
+        
+        for folder in folders {
+            allFolders.append(folder)
+            allFolders.append(contentsOf: getAllFoldersRecursive(folders: folder.content))
+        }
+        
+        return allFolders
+    }
+    
+    private func isSubfolderOf(_ targetFolder: Folder, in parentFolder: Folder) -> Bool {
+        // Verifica se targetFolder è uguale a parentFolder
+        if targetFolder.id == parentFolder.id {
+            return true
+        }
+        
+        // Verifica ricorsivamente nelle sottocartelle di parentFolder
+        for subfolder in parentFolder.content {
+            if isSubfolderOf(targetFolder, in: subfolder) {
+                return true
+            }
+        }
+        
+        return false
+    }
 }
 
 struct MainView: View {
     // MARK: - State Variables
-    @State private var showingSidebar = false
     @State private var showingSettings = false
     @State private var showingNewItemOptions = false
     @State private var showingNewFolderSheet = false
@@ -118,13 +250,154 @@ struct MainView: View {
     @State private var searchText = ""
     @StateObject private var folderManager = FolderManager()
     
+    // MARK: - Folder Operations State
+    @State private var showingEditFolderSheet = false
+    @State private var showingMoveFolderSheet = false
+    @State private var showingDeleteConfirmation = false
+    @State private var showingShareSheet = false
+    @State private var selectedFolder: Folder?
+    @State private var editFolderName = ""
+    @State private var editFolderColor = Color.blue
+    
     // MARK: - Mock User Data
     private let mockUserEmail = "utente@example.com"
     
+    // MARK: - Responsive Grid Columns
+    private func adaptiveColumns(for geometry: GeometryProxy) -> [GridItem] {
+        let availableWidth = geometry.size.width - 40 // Padding orizzontale
+        let cardWidth: CGFloat = 198 // Ridotto del 10% da 220
+        let spacing: CGFloat = 30
+        
+        // Calcola il numero di colonne che possono entrare
+        let columnsCount = max(1, Int((availableWidth + spacing) / (cardWidth + spacing)))
+        
+        return Array(repeating: GridItem(.flexible(minimum: cardWidth, maximum: cardWidth), spacing: spacing), count: columnsCount)
+    }
+    
     var body: some View {
-        GeometryReader { geometry in
-            ZStack {
-                // Vista principale
+        NavigationSplitView(columnVisibility: .constant(.all)) {
+            // MARK: - Sidebar Content
+            VStack(alignment: .leading, spacing: 20) {
+                // Header con avatar utente
+                HStack(spacing: 12) {
+                    Image(systemName: "person.crop.circle.fill")
+                        .font(.system(size: 40))
+                        .foregroundColor(.blue)
+                    
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Benvenuto")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                        
+                        Text(mockUserEmail)
+                            .font(.body)
+                            .fontWeight(.medium)
+                            .foregroundColor(.primary)
+                            .lineLimit(1)
+                    }
+                    
+                    Spacer()
+                }
+                .padding(.horizontal, 16)
+                .padding(.top, 20)
+                
+                Divider()
+                    .padding(.horizontal, 16)
+                
+                // Menu Items
+                VStack(spacing: 12) {
+                    // Pulsante Home/Tutti i Quaderni
+                    Button(action: {
+                        folderManager.currentPath.removeAll()
+                    }) {
+                        HStack {
+                            Image(systemName: "house.fill")
+                                .font(.title3)
+                            Text("Tutti i Quaderni")
+                                .font(.body)
+                            Spacer()
+                        }
+                        .foregroundColor(.primary)
+                        .padding(.vertical, 12)
+                        .padding(.horizontal, 16)
+                        .background(
+                            RoundedRectangle(cornerRadius: 8)
+                                .fill(folderManager.currentPath.isEmpty ? Color.blue.opacity(0.1) : Color.clear)
+                        )
+                    }
+                    
+                    // Pulsante Crea Nuovo
+                    Button(action: {
+                        showingNewItemOptions = true
+                    }) {
+                        HStack {
+                            Image(systemName: "plus.circle.fill")
+                                .font(.title3)
+                            Text("Crea Nuovo")
+                                .font(.body)
+                            Spacer()
+                        }
+                        .foregroundColor(.blue)
+                        .padding(.vertical, 12)
+                        .padding(.horizontal, 16)
+                        .background(
+                            RoundedRectangle(cornerRadius: 8)
+                                .fill(Color.blue.opacity(0.1))
+                        )
+                    }
+                    
+                    // Pulsante Impostazioni
+                    Button(action: {
+                        showingSettings = true
+                    }) {
+                        HStack {
+                            Image(systemName: "gearshape")
+                                .font(.title3)
+                            Text("Impostazioni")
+                                .font(.body)
+                            Spacer()
+                        }
+                        .foregroundColor(.primary)
+                        .padding(.vertical, 12)
+                        .padding(.horizontal, 16)
+                        .background(
+                            RoundedRectangle(cornerRadius: 8)
+                                .fill(Color.gray.opacity(0.1))
+                        )
+                    }
+                    
+                    Spacer()
+                    
+                    // Pulsante Log Out
+                    Button(action: {
+                        // TODO: Implementare logout
+                        print("Log out tapped")
+                    }) {
+                        HStack {
+                            Image(systemName: "arrow.right.square")
+                                .font(.title3)
+                            Text("Log Out")
+                                .font(.body)
+                            Spacer()
+                        }
+                        .foregroundColor(.red)
+                        .padding(.vertical, 12)
+                        .padding(.horizontal, 16)
+                        .background(
+                            RoundedRectangle(cornerRadius: 8)
+                                .fill(Color.red.opacity(0.1))
+                        )
+                    }
+                }
+                .padding(.horizontal, 16)
+                .padding(.bottom, 30)
+            }
+            .navigationTitle("Menu")
+            .navigationBarTitleDisplayMode(.inline)
+            
+        } detail: {
+            // MARK: - Main Content
+            GeometryReader { geometry in
                 NavigationView {
                     VStack(alignment: .leading, spacing: 0) {
                         // Breadcrumbs
@@ -132,28 +405,31 @@ struct MainView: View {
                             BreadcrumbsView(folderManager: folderManager)
                                 .padding(.horizontal)
                                 .padding(.top, 8)
+                                .padding(.bottom, 10)
                         }
                         
-                        // Contenuto principale
+                        // Contenuto principale con griglia responsive
                         ScrollView {
                             LazyVGrid(
-                                columns: [
-                                    GridItem(.flexible(minimum: 220, maximum: 220), spacing: 30),
-                                    GridItem(.flexible(minimum: 220, maximum: 220), spacing: 30),
-                                    GridItem(.flexible(minimum: 220, maximum: 220), spacing: 30),
-                                    GridItem(.flexible(minimum: 220, maximum: 220), spacing: 30)
-                                ],
+                                columns: adaptiveColumns(for: geometry),
                                 alignment: .leading,
                                 spacing: 30
                             ) {
                                 // Cartelle esistenti
                                 ForEach(folderManager.currentFolders) { folder in
-                                    FolderCardView(folder: folder)
-                                        .onTapGesture {
-                                            withAnimation(.easeInOut(duration: 0.3)) {
-                                                folderManager.navigateToFolder(folder)
-                                            }
+                                    FolderCardView(
+                                        folder: folder,
+                                        selectedFolder: $selectedFolder,
+                                        showingEditFolderSheet: $showingEditFolderSheet,
+                                        showingMoveFolderSheet: $showingMoveFolderSheet,
+                                        showingDeleteConfirmation: $showingDeleteConfirmation,
+                                        showingShareSheet: $showingShareSheet
+                                    )
+                                    .onTapGesture {
+                                        withAnimation(.easeInOut(duration: 0.3)) {
+                                            folderManager.navigateToFolder(folder)
                                         }
+                                    }
                                 }
                                 
                                 // Card "Crea Nuovo" - sempre ultima a destra
@@ -168,31 +444,29 @@ struct MainView: View {
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
                     .navigationTitle("NoteCraft")
-                    .navigationBarTitleDisplayMode(.large)
-                    .searchable(text: $searchText, prompt: "Cerca quaderni e cartelle")
+                    .navigationBarTitleDisplayMode(.inline)
                     .toolbar {
-                        // Avatar utente e email a sinistra
-                        ToolbarItem(placement: .navigationBarLeading) {
-                            Button(action: {
-                                withAnimation(.easeInOut(duration: 0.3)) {
-                                    showingSidebar = true
-                                }
-                            }) {
-                                HStack(spacing: 8) {
-                                    Image(systemName: "person.crop.circle")
-                                        .font(.title2)
-                                        .foregroundColor(.blue)
-                                    
-                                    Text(mockUserEmail)
-                                        .font(.caption)
-                                        .foregroundColor(.primary)
-                                        .lineLimit(1)
-                                }
+                        // Gruppo di elementi allineati a destra
+                        ToolbarItemGroup(placement: .navigationBarTrailing) {
+                            // Barra di ricerca
+                            HStack {
+                                Image(systemName: "magnifyingglass")
+                                    .foregroundColor(.gray)
+                                    .font(.system(size: 16))
+                                
+                                TextField("Cerca quaderni e cartelle", text: $searchText)
+                                    .textFieldStyle(PlainTextFieldStyle())
+                                    .font(.system(size: 16))
                             }
-                        }
-                        
-                        // Pulsante Nuovo Elemento a destra
-                        ToolbarItem(placement: .navigationBarTrailing) {
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 8)
+                            .background(
+                                RoundedRectangle(cornerRadius: 20)
+                                    .fill(Color(.systemGray6))
+                            )
+                            .frame(width: 250)
+                            
+                            // Pulsante Nuovo Elemento
                             Button(action: {
                                 showingNewItemOptions = true
                             }) {
@@ -204,15 +478,6 @@ struct MainView: View {
                     }
                 }
                 .navigationViewStyle(StackNavigationViewStyle())
-                
-                // Barra laterale
-                if showingSidebar {
-                    SidebarView(
-                        isPresented: $showingSidebar,
-                        showingSettings: $showingSettings,
-                        sidebarWidth: geometry.size.width / 5
-                    )
-                }
             }
         }
         .sheet(isPresented: $showingSettings) {
@@ -231,6 +496,49 @@ struct MainView: View {
             )
             .presentationDetents([.medium])
         }
+        // MARK: - Folder Operations Sheets
+        .sheet(isPresented: $showingEditFolderSheet) {
+            if let folder = selectedFolder {
+                EditFolderView(
+                    folder: folder,
+                    folderManager: folderManager,
+                    editFolderName: $editFolderName,
+                    editFolderColor: $editFolderColor
+                )
+                .onAppear {
+                    editFolderName = folder.name
+                    editFolderColor = folder.color
+                }
+            }
+        }
+        .sheet(isPresented: $showingMoveFolderSheet) {
+            if let folder = selectedFolder {
+                MoveFolderView(
+                    folder: folder,
+                    folderManager: folderManager
+                )
+            }
+        }
+        .sheet(isPresented: $showingShareSheet) {
+            if let folder = selectedFolder {
+                ShareFolderView(folder: folder)
+            }
+        }
+        .alert("Elimina Cartella", isPresented: $showingDeleteConfirmation) {
+            Button("Elimina", role: .destructive) {
+                if let folder = selectedFolder {
+                    folderManager.deleteFolder(folder)
+                    selectedFolder = nil
+                }
+            }
+            Button("Annulla", role: .cancel) {
+                selectedFolder = nil
+            }
+        } message: {
+            if let folder = selectedFolder {
+                Text("Sei sicuro di voler eliminare la cartella '\(folder.name)' e tutto il suo contenuto? Questa azione non può essere annullata.")
+            }
+        }
     }
     
 }
@@ -247,7 +555,7 @@ struct BookCardView: View {
                  RoundedRectangle(cornerRadius: 10)
                      .fill(Color.blue.opacity(0.1))
                      .stroke(Color.blue.opacity(0.3), lineWidth: 2)
-                     .frame(width: 220, height: 280)
+                     .frame(width: 198, height: 252)
                  
                  VStack(spacing: 12) {
                      // Simbolo "+" centrato
@@ -275,6 +583,12 @@ struct BookCardView: View {
 // MARK: - FolderCardView Component
 struct FolderCardView: View {
     let folder: Folder
+    @State private var showingContextMenu = false
+    @Binding var selectedFolder: Folder?
+    @Binding var showingEditFolderSheet: Bool
+    @Binding var showingMoveFolderSheet: Bool
+    @Binding var showingDeleteConfirmation: Bool
+    @Binding var showingShareSheet: Bool
     
     var body: some View {
         VStack(spacing: 10) {
@@ -284,7 +598,7 @@ struct FolderCardView: View {
                 RoundedRectangle(cornerRadius: 10)
                     .fill(folder.color.opacity(0.1))
                     .stroke(folder.color.opacity(0.3), lineWidth: 2)
-                    .frame(width: 220, height: 280)
+                    .frame(width: 198, height: 252)
                 
                 VStack(spacing: 16) {
                     // Icona cartella
@@ -301,12 +615,58 @@ struct FolderCardView: View {
                         .lineLimit(2)
                         .padding(.horizontal, 12)
                 }
+                
+                // Menu tre puntini nell'angolo superiore destro
+                VStack {
+                    HStack {
+                        Spacer()
+                        Button(action: {
+                            showingContextMenu = true
+                        }) {
+                            Image(systemName: "ellipsis")
+                                .font(.system(size: 16, weight: .semibold))
+                                .foregroundColor(.gray)
+                                .padding(8)
+                                .background(
+                                    Circle()
+                                        .fill(Color.white.opacity(0.9))
+                                        .shadow(color: .black.opacity(0.1), radius: 2, x: 0, y: 1)
+                                )
+                        }
+                        .padding(.top, 8)
+                        .padding(.trailing, 8)
+                    }
+                    Spacer()
+                }
             }
             
             // Numero di elementi
             Text("\(folder.content.count) elementi")
                 .font(.body)
                 .foregroundColor(.secondary)
+        }
+        .confirmationDialog("Opzioni Cartella", isPresented: $showingContextMenu, titleVisibility: .visible) {
+            Button("Modifica") {
+                selectedFolder = folder
+                showingEditFolderSheet = true
+            }
+            
+            Button("Sposta") {
+                selectedFolder = folder
+                showingMoveFolderSheet = true
+            }
+            
+            Button("Condividi") {
+                selectedFolder = folder
+                showingShareSheet = true
+            }
+            
+            Button("Elimina", role: .destructive) {
+                selectedFolder = folder
+                showingDeleteConfirmation = true
+            }
+            
+            Button("Annulla", role: .cancel) { }
         }
     }
 }
@@ -648,6 +1008,384 @@ struct NewFolderCreationView: View {
                 }
             }
         }
+    }
+}
+
+// MARK: - Edit Folder View
+struct EditFolderView: View {
+    let folder: Folder
+    let folderManager: FolderManager
+    @Binding var editFolderName: String
+    @Binding var editFolderColor: Color
+    @Environment(\.dismiss) private var dismiss
+    
+    let availableColors: [Color] = [.blue, .green, .orange, .red, .purple, .pink, .yellow, .gray]
+    
+    var body: some View {
+        NavigationView {
+            VStack(spacing: 30) {
+                VStack(spacing: 20) {
+                    // Nome cartella
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Nome Cartella")
+                            .font(.headline)
+                            .foregroundColor(.primary)
+                        
+                        TextField("Inserisci nome cartella", text: $editFolderName)
+                            .textFieldStyle(RoundedBorderTextFieldStyle())
+                            .font(.body)
+                    }
+                    
+                    // Selezione colore
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("Colore Cartella")
+                            .font(.headline)
+                            .foregroundColor(.primary)
+                        
+                        LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 4), spacing: 15) {
+                            ForEach(availableColors, id: \.self) { color in
+                                Button(action: {
+                                    editFolderColor = color
+                                }) {
+                                    Circle()
+                                        .fill(color)
+                                        .frame(width: 50, height: 50)
+                                        .overlay(
+                                            Circle()
+                                                .stroke(editFolderColor == color ? Color.black : Color.clear, lineWidth: 3)
+                                        )
+                                }
+                            }
+                        }
+                    }
+                }
+                .padding(.horizontal, 20)
+                
+                Spacer()
+                
+                // Pulsante Salva
+                Button(action: {
+                    let trimmedName = editFolderName.trimmingCharacters(in: .whitespacesAndNewlines)
+                    if !trimmedName.isEmpty {
+                        folderManager.updateFolder(folder, newName: trimmedName, newColor: editFolderColor)
+                        dismiss()
+                    }
+                }) {
+                    Text("Salva Modifiche")
+                        .font(.headline)
+                        .foregroundColor(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 16)
+                        .background(
+                            RoundedRectangle(cornerRadius: 12)
+                                .fill(editFolderName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? Color.gray : editFolderColor)
+                        )
+                }
+                .disabled(editFolderName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                .padding(.horizontal, 20)
+                .padding(.bottom, 20)
+            }
+            .navigationTitle("Modifica Cartella")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Annulla") {
+                        dismiss()
+                    }
+                }
+            }
+        }
+    }
+}
+
+// MARK: - Move Folder View
+struct MoveFolderView: View {
+    let folder: Folder
+    let folderManager: FolderManager
+    @Environment(\.dismiss) private var dismiss
+    @State private var selectedDestination: [Folder] = []
+    @State private var showingMoveError = false
+    
+    var availableFolders: [Folder] {
+        return folderManager.getAllFolders().filter { $0.id != folder.id }
+    }
+    
+    var body: some View {
+        NavigationView {
+            VStack(spacing: 20) {
+                // Informazioni cartella da spostare
+                VStack(spacing: 12) {
+                    Text("Spostare la cartella:")
+                        .font(.headline)
+                        .foregroundColor(.secondary)
+                    
+                    HStack {
+                        Image(systemName: "folder.fill")
+                            .font(.title2)
+                            .foregroundColor(folder.color)
+                        
+                        Text(folder.name)
+                            .font(.title3)
+                            .fontWeight(.semibold)
+                    }
+                    .padding(.vertical, 12)
+                    .padding(.horizontal, 20)
+                    .background(
+                        RoundedRectangle(cornerRadius: 10)
+                            .fill(folder.color.opacity(0.1))
+                            .stroke(folder.color.opacity(0.3), lineWidth: 1)
+                    )
+                }
+                .padding(.horizontal, 20)
+                
+                Divider()
+                
+                // Lista destinazioni
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("Seleziona destinazione:")
+                        .font(.headline)
+                        .padding(.horizontal, 20)
+                    
+                    ScrollView {
+                        VStack(spacing: 8) {
+                            // Opzione "Cartella principale"
+                            Button(action: {
+                                selectedDestination = []
+                            }) {
+                                HStack {
+                                    Image(systemName: "house.fill")
+                                        .font(.title3)
+                                        .foregroundColor(.blue)
+                                    
+                                    Text("Cartella Principale")
+                                        .font(.body)
+                                        .foregroundColor(.primary)
+                                    
+                                    Spacer()
+                                    
+                                    if selectedDestination.isEmpty {
+                                        Image(systemName: "checkmark.circle.fill")
+                                            .foregroundColor(.blue)
+                                    }
+                                }
+                                .padding(.vertical, 12)
+                                .padding(.horizontal, 16)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 8)
+                                        .fill(selectedDestination.isEmpty ? Color.blue.opacity(0.1) : Color.clear)
+                                )
+                            }
+                            
+                            // Cartelle disponibili
+                            ForEach(availableFolders) { availableFolder in
+                                Button(action: {
+                                    selectedDestination = [availableFolder]
+                                }) {
+                                    HStack {
+                                        Image(systemName: "folder.fill")
+                                            .font(.title3)
+                                            .foregroundColor(availableFolder.color)
+                                        
+                                        Text(availableFolder.name)
+                                            .font(.body)
+                                            .foregroundColor(.primary)
+                                        
+                                        Spacer()
+                                        
+                                        if selectedDestination.first?.id == availableFolder.id {
+                                            Image(systemName: "checkmark.circle.fill")
+                                                .foregroundColor(.blue)
+                                        }
+                                    }
+                                    .padding(.vertical, 12)
+                                    .padding(.horizontal, 16)
+                                    .background(
+                                        RoundedRectangle(cornerRadius: 8)
+                                            .fill(selectedDestination.first?.id == availableFolder.id ? Color.blue.opacity(0.1) : Color.clear)
+                                    )
+                                }
+                            }
+                        }
+                        .padding(.horizontal, 20)
+                    }
+                }
+                
+                Spacer()
+                
+                // Pulsante Sposta
+                Button(action: {
+                    let success = folderManager.moveFolder(folder, to: selectedDestination)
+                    if success {
+                        dismiss()
+                    } else {
+                        showingMoveError = true
+                    }
+                }) {
+                    Text("Sposta Cartella")
+                        .font(.headline)
+                        .foregroundColor(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 16)
+                        .background(
+                            RoundedRectangle(cornerRadius: 12)
+                                .fill(Color.blue)
+                        )
+                }
+                .padding(.horizontal, 20)
+                .padding(.bottom, 20)
+            }
+            .navigationTitle("Sposta Cartella")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Annulla") {
+                        dismiss()
+                    }
+                }
+            }
+            .alert("Spostamento Non Valido", isPresented: $showingMoveError) {
+                Button("OK") { }
+            } message: {
+                Text("Non è possibile spostare una cartella all'interno di se stessa o delle sue sottocartelle.")
+            }
+        }
+    }
+}
+
+// MARK: - Share Folder View
+struct ShareFolderView: View {
+    let folder: Folder
+    @Environment(\.dismiss) private var dismiss
+    @State private var shareMessage = ""
+    @State private var showingMessageComposer = false
+    
+    var body: some View {
+        NavigationView {
+            VStack(spacing: 30) {
+                // Informazioni cartella
+                VStack(spacing: 16) {
+                    Image(systemName: "folder.fill")
+                        .font(.system(size: 60))
+                        .foregroundColor(folder.color)
+                    
+                    Text(folder.name)
+                        .font(.title2)
+                        .fontWeight(.semibold)
+                    
+                    Text("\(folder.content.count) elementi")
+                        .font(.body)
+                        .foregroundColor(.secondary)
+                }
+                .padding(.vertical, 20)
+                .padding(.horizontal, 30)
+                .background(
+                    RoundedRectangle(cornerRadius: 15)
+                        .fill(folder.color.opacity(0.1))
+                        .stroke(folder.color.opacity(0.3), lineWidth: 1)
+                )
+                .padding(.horizontal, 20)
+                
+                // Messaggio personalizzato
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("Messaggio (opzionale)")
+                        .font(.headline)
+                        .foregroundColor(.primary)
+                    
+                    TextEditor(text: $shareMessage)
+                        .frame(height: 100)
+                        .padding(12)
+                        .background(
+                            RoundedRectangle(cornerRadius: 8)
+                                .stroke(Color.gray.opacity(0.3), lineWidth: 1)
+                        )
+                        .font(.body)
+                }
+                .padding(.horizontal, 20)
+                
+                Spacer()
+                
+                // Pulsanti di condivisione
+                VStack(spacing: 12) {
+                    Button(action: {
+                        shareViaMessage()
+                    }) {
+                        HStack {
+                            Image(systemName: "message.fill")
+                                .font(.title3)
+                            Text("Condividi via Messaggio")
+                                .font(.headline)
+                        }
+                        .foregroundColor(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 16)
+                        .background(
+                            RoundedRectangle(cornerRadius: 12)
+                                .fill(Color.blue)
+                        )
+                    }
+                    
+                    Button(action: {
+                        shareViaEmail()
+                    }) {
+                        HStack {
+                            Image(systemName: "envelope.fill")
+                                .font(.title3)
+                            Text("Condividi via Email")
+                                .font(.headline)
+                        }
+                        .foregroundColor(.blue)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 16)
+                        .background(
+                            RoundedRectangle(cornerRadius: 12)
+                                .stroke(Color.blue, lineWidth: 2)
+                        )
+                    }
+                }
+                .padding(.horizontal, 20)
+                .padding(.bottom, 20)
+            }
+            .navigationTitle("Condividi Cartella")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Chiudi") {
+                        dismiss()
+                    }
+                }
+            }
+        }
+        .onAppear {
+            shareMessage = "Ti condivido la cartella '\(folder.name)' da NoteCraft!"
+        }
+    }
+    
+    private func shareViaMessage() {
+        let message = shareMessage.isEmpty ? "Ti condivido la cartella '\(folder.name)' da NoteCraft!" : shareMessage
+        
+        // Simula l'invio del messaggio
+        print("Condivisione via messaggio:")
+        print("Cartella: \(folder.name)")
+        print("Messaggio: \(message)")
+        
+        // In una implementazione reale, qui apriresti l'app Messaggi
+        // o useresti MessageUI framework
+        
+        dismiss()
+    }
+    
+    private func shareViaEmail() {
+        let message = shareMessage.isEmpty ? "Ti condivido la cartella '\(folder.name)' da NoteCraft!" : shareMessage
+        
+        // Simula l'invio dell'email
+        print("Condivisione via email:")
+        print("Cartella: \(folder.name)")
+        print("Messaggio: \(message)")
+        
+        // In una implementazione reale, qui apriresti l'app Mail
+        // o useresti MessageUI framework
+        
+        dismiss()
     }
 }
 
